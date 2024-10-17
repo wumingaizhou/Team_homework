@@ -30,7 +30,7 @@ export default {
       name: '3D Model with Multiple Materials',
       position: Cesium.Cartesian3.fromDegrees(112.94572462738567, 28.187290962027645, 40), // 模型的经纬度和高度
       model: {
-        uri: '/public/3Dmodels/3dtest.gltf',  // 模型文件路径
+        uri: '3Dmodels/3dtest.gltf',  // 模型文件路径
         scale: 1.0,
         minimumPixelSize: 128,
         maximumScale: 20000
