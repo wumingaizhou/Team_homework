@@ -17,6 +17,7 @@
         <el-menu-item index="2-1" @click="changeBaseMap(imageSourceArry.tdt)">天地图</el-menu-item>
         <el-menu-item index="2-2" @click="changeBaseMap(imageSourceArry.esri)">Arcgis底图</el-menu-item>
         <el-menu-item index="2-3" @click="changeBaseMap(imageSourceArry.osm)">OSM底图（加载慢）</el-menu-item>
+        <el-menu-item index="2-4" @click="changeBaseMap(imageSourceArry.stadiaLayer)">简化视觉底图</el-menu-item>
       </el-submenu>
       <el-submenu index="3">
         <template slot="title"><i class="el-icon-menu large-icon"></i>基础功能</template>
@@ -26,6 +27,14 @@
             active-color="#13ce66"
             inactive-color="#ff4949"
             @change="toggleTerrain">
+          </el-switch>
+        </el-menu-item>
+        <el-menu-item index="3-2">天气特效
+          <el-switch
+            v-model="isWeatherTrue"
+            active-color="#13ce66"
+            inactive-color="#ff4949"
+            @change="toggleWeather">
           </el-switch>
         </el-menu-item>
       </el-submenu>
@@ -40,6 +49,7 @@
     data() {
       return {
         is3Dtrue:false,
+        isWeatherTrue:true,
         activeIndex: '1',
         imageSourceArry:{
           tdt: new Cesium.UrlTemplateImageryProvider({
@@ -61,6 +71,10 @@
           osm:new Cesium.OpenStreetMapImageryProvider({
             url: 'https://a.tile.openstreetmap.org/' // OSM地图瓦片服务URL
           }),
+          stadiaLayer: new Cesium.UrlTemplateImageryProvider({
+            url: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}.png',
+            credit: '© Stadia Maps, © OpenMapTiles, © OpenStreetMap contributors'
+          }),
         }
       };
     },
@@ -75,7 +89,11 @@
       toggleTerrain(value) {
       // 发送切换地形事件
       imageBus.$emit('toggle-terrain', value);
-    },
+      },
+      toggleWeather(value){
+      //发送是否显示天气特性开关
+      imageBus.$emit('toggle-weather',value);
+      },
     }
   }
 </script>
