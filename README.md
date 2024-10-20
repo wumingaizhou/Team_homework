@@ -1,25 +1,5 @@
 # 简介
 
-## Project setup
-```
-npm install
-```
+选修课小组作业
 
-### Compiles and hot-reloads for development
-```
-npm run serve
-```
-
-### Compiles and minifies for production
-```
-npm run build
-```
-
-### Lints and fixes files
-```
-npm run lint
-```
-
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
-
+在线预览效果：[Team-homework](https://wumingaizhou.github.io/Team_homework/)

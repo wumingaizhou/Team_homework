@@ -4,215 +4,149 @@
       <el-select
         v-model="weatherVal"
         placeholder="请选择天气"
-        @change="weatherChange"
-      >
+        @change="weatherChange">
         <el-option
           v-for="item in weatherOpts"
           :key="item.value"
           :label="item.label"
-          :value="item.value"
-        >
+          :value="item.value">
         </el-option>
       </el-select>
-      <el-button size="mini" @click="weatherClose" class="close-btn"
-        >关闭</el-button
-      >
+      <el-button size="mini" @click="weatherClose" class="close-btn">关闭</el-button>
     </div>
   </div>
 </template>
-<script type="module">
-import imageBus from '@/utils/imageEvent';
-import WeatherRain from "../../public/Cesium/CesiumWeather/WeatherRain";
-import WeatherSnow from "../../public/Cesium/CesiumWeather/WeatherSnow";
-import WeatherFog from "../../public/Cesium/CesiumWeather/WeatherFog";
 
-let rainObj = undefined;
-let snowObj = undefined;
-let fogObj = undefined;
+<script type="module">
+import imageBus from '@/utils/imageEvent'; // 用于与其他组件通信
+import eventAsideMain from '@/utils/eventAsideMain'; // 另一个事件总线，用于场景和实体切换
+import WeatherRain from "../../public/Cesium/CesiumWeather/WeatherRain"; // 导入雨效果
+import WeatherSnow from "../../public/Cesium/CesiumWeather/WeatherSnow"; // 导入雪效果
+import WeatherFog from "../../public/Cesium/CesiumWeather/WeatherFog";   // 导入雾效果
+
+// 全局存储天气对象，避免重复实例化
+let weatherObjs = {
+  rain: undefined,
+  snow: undefined,
+  fog: undefined,
+};
+
 export default {
   data(){
     return {
-      loading:false,
-      weatherTool:true,
-      weatherVal: "请选择天气",
+      loading: false,  // 用于地形切换时的加载状态
+      weatherTool: true, // 控制天气工具的显示与隐藏
+      weatherVal: "请选择天气", // 当前选择的天气值
       weatherOpts: [
-        {
-          value: "rain",
-          label: "雨",
-        },
-        {
-          value: "snow",
-          label: "雪",
-        },
-        {
-          value: "fog",
-          label: "雾",
-        },
-      ],
+        { value: "rain", label: "雨" },
+        { value: "snow", label: "雪" },
+        { value: "fog", label: "雾" },
+      ], // 天气选项数组
     }
   },
   async mounted() {
-    // 设置 Cesium Ion Token
-    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwMGQ2OTY0OS05OWNiLTRmZDctYTcwNi1lYTY1NTVhODBhNDYiLCJpZCI6MjM5MTExLCJpYXQiOjE3MjU0NTU0ODZ9.JbglzGJ8dBc1tbZbb9GTKEuRlxyE6mXZKIWJ7E_diW4';
-    // 初始化 Cesium Viewer
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIwMGQ2OTY0OS05OWNiLTRmZDctYTcwNi1lYTY1NTVhODBhNDYiLCJpZCI6MjM5MTExLCJpYXQiOjE3MjU0NTU0ODZ9.JbglzGJ8dBc1tbZbb9GTKEuRlxyE6mXZKIWJ7E_diW4'; // 替换为实际 Cesium 令牌
     this.viewer = new Cesium.Viewer('cesiumContainer', {
-      animation: false,           // 时间轴控件
-      timeline: false,            // 时间线控件
-      fullscreenButton: true,     // 全屏按钮
-      homeButton: false,          // 主页按钮
-      sceneModePicker: false,     // 场景模式选择器
-      baseLayerPicker: false,     // 图层选择器
-      geocoder: false,            // 地址搜索
-      navigationHelpButton: false,// 导航帮助按钮
-      infoBox: false,             // 信息框
-      selectionIndicator: false,  // 选择指示器
-      terrainProvider: new Cesium.EllipsoidTerrainProvider()// 默认不开启 3D 地形
+      animation: false,
+      timeline: false,
+      fullscreenButton: true,
+      homeButton: false,
+      sceneModePicker: false,
+      baseLayerPicker: false,
+      geocoder: false,
+      navigationHelpButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(), // 默认使用椭球地形
     });
-    this.viewer._cesiumWidget._creditContainer.style.display = "none"; // 隐藏版权
-
-    // 获取 Cesium Viewer 的影像图层
-    this.imageLayers = this.viewer.imageryLayers;
-
+    this.viewer._cesiumWidget._creditContainer.style.display = "none"; // 隐藏 Cesium 的版权信息
+    this.imageLayers = this.viewer.imageryLayers; // 图层管理
     this.scene = this.viewer.scene;
-    this.scene.globe.depthTestAgainstTerrain = true;
+    this.scene.globe.depthTestAgainstTerrain = true; // 启用深度测试
 
-    // 添加一个实体并加载 gltf 模型
+    // 添加一个3D实体模型
     const entity = this.viewer.entities.add({
       name: '3D Model with Multiple Materials',
-      position: Cesium.Cartesian3.fromDegrees(112.94572462738567, 28.187290962027645, 40), // 模型的经纬度和高度
+      position: Cesium.Cartesian3.fromDegrees(112.94572462738567, 28.187290962027645, 40),
       model: {
-        uri: '3Dmodels/3dtest.gltf',  // 模型文件路径
-        scale: 1.0,
+        uri: '3Dmodels/model.glb', // 替换为实际模型路径
+        scale: 50.0,
         minimumPixelSize: 128,
         maximumScale: 20000
       }
     });
-    // 将视角聚焦到实体
-    this.viewer.zoomTo(entity);
+    this.Entity = entity;
+    this.viewer.flyTo(entity, { duration: 1.65 }); // 相机飞向实体位置
 
-    // 监听事件
+    // 事件监听器：用于与其他组件通信，处理地图/天气/地形的切换
     imageBus.$on('changeBaseMap', this.changeMap);
     imageBus.$on('toggle-terrain', this.toggleTerrain);
     imageBus.$on('toggle-weather', this.toggleWeather);
-    this.weatherChange('');
+    eventAsideMain.$on('toggle-entitys', this.toggleEntitys);
+    eventAsideMain.$on('toggle-scene', this.toggleScene);
+    this.weatherChange(''); // 初次加载时重置天气
   },
   beforeDestroy() {
-    // 移除事件监听器
+    // 销毁组件时取消事件监听器，防止内存泄漏
     imageBus.$off('changeBaseMap', this.changeMap);
     imageBus.$off('toggle-terrain', this.toggleTerrain);
     imageBus.$off('toggle-weather', this.toggleWeather);
+    eventAsideMain.$off('toggle-entitys', this.toggleEntitys);
+    eventAsideMain.$off('toggle-scene', this.toggleScene);
   },
   methods: {
-    // 切换地形
+    // 切换地形：根据选择的值切换 2D 或 3D 地形
     async toggleTerrain(value) {
-      if (value) {
-        this.loading = true;
-        this.viewer.terrainProvider = await Cesium.createWorldTerrainAsync(); // 启用 3D 地形
-        this.$message({
-          message: '已切换到 3D 地形',
-          type: 'success'
-        });
-        this.loading = false;
-      } else {
-        this.loading = true;
-        this.viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider(); // 使用平滑的椭球模型
-        this.$message({
-          message: '已切换到 2D 地形',
-          type: 'success'
-        });
-        this.loading = false;
-      }
+      this.loading = true;
+      const terrainProvider = value ? await Cesium.createWorldTerrainAsync() : new Cesium.EllipsoidTerrainProvider();
+      this.viewer.terrainProvider = terrainProvider;
+      this.$message({ message: `已切换到 ${value ? '3D' : '2D'} 地形`, type: 'success' });
+      this.loading = false;
     },
-    // 更改底图
+    // 切换底图：更换地图图层
     changeMap(image) {
       this.imageLayers.removeAll();
       this.imageLayers.addImageryProvider(image);
     },
-    //是否显示天气特性开关
-    toggleWeather(value){
+    // 控制天气工具的显示与隐藏
+    toggleWeather(value) {
       this.weatherTool = value;
     },
-    //天气特效
+    // 切换天气特效：根据选择的天气应用特效
     weatherChange(val) {
-      switch (val) {
-        case "rain":
-          if (snowObj) {
-            snowObj.show(false);
-          }
-          if (fogObj) {
-            fogObj.show(false);
-          }
-          if (!rainObj) {
-            rainObj = new WeatherRain(this.viewer, {
-              tiltAngle: -0.2,
-              rainSize: 0.5,
-              rainSpeed: 380.0,
-            });
-          }
-          rainObj.show(true);
-          break;
-        case "snow":
-          if (rainObj) {
-            rainObj.show(false);
-          }
-          if (fogObj) {
-            fogObj.show(false);
-          }
-          if (!snowObj) {
-            snowObj = new WeatherSnow(this.viewer, {
-              snowSize: 0.02, //雪大小
-              snowSpeed: 80.0, //雪速
-            });
-          }
-          snowObj.show(true);
-          break;
-        case "fog":
-          if (rainObj) {
-            rainObj.show(false);
-          }
-          if (snowObj) {
-            snowObj.show(false);
-          }
-          if (!fogObj) {
-            fogObj = new WeatherFog(this.viewer, {
-              visibility: 0.25,
-              color: new Cesium.Color(0.8, 0.8, 0.8, 0.3),
-            });
-          }
-          fogObj.show(true);
-          break;
+      this.clearWeatherEffects(); // 每次切换时先清除现有天气效果
+      if (val && !weatherObjs[val]) {
+        switch (val) {
+          case "rain":
+            weatherObjs.rain = new WeatherRain(this.viewer, { tiltAngle: -0.2, rainSize: 0.5, rainSpeed: 380.0 });
+            break;
+          case "snow":
+            weatherObjs.snow = new WeatherSnow(this.viewer, { snowSize: 0.02, snowSpeed: 80.0 });
+            break;
+          case "fog":
+            weatherObjs.fog = new WeatherFog(this.viewer, { visibility: 0.25, color: new Cesium.Color(0.8, 0.8, 0.8, 0.3) });
+            break;
+        }
       }
+      if (weatherObjs[val]) weatherObjs[val].show(true); // 显示选择的天气特效
+    },
+    // 清除当前的所有天气效果
+    clearWeatherEffects() {
+      Object.values(weatherObjs).forEach(obj => obj && obj.show(false));
     },
     // 关闭天气特效
     weatherClose() {
-      if (rainObj) {
-        rainObj.show(false);
-      }
-      if (snowObj) {
-        snowObj.show(false);
-      }
-      if (fogObj) {
-        fogObj.show(false);
-      }
+      this.clearWeatherEffects();
     },
-    getLocation() {
-      let handler = new Cesium.ScreenSpaceEventHandler(this.viewer.canvas);
-      handler.setInputAction(function (event) {
-        let earthPosition = this.viewer.scene.pickPosition(event.position);
-        if (Cesium.defined(earthPosition)) {
-          let cartographic = Cesium.Cartographic.fromCartesian(earthPosition);
-          let lon = Cesium.Math.toDegrees(cartographic.longitude).toFixed(5);
-          let lat = Cesium.Math.toDegrees(cartographic.latitude).toFixed(5);
-          let height = cartographic.height.toFixed(2);
-          console.log(earthPosition, {
-            lon: lon,
-            lat: lat,
-            height: height,
-          });
-        }
-      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    // 切换实体的显示与隐藏
+    toggleEntitys(value) {
+      this.Entity.show = value;
     },
-    },
+    // 切换场景的显示与隐藏
+    toggleScene(value) {
+      this.viewer.scene.globe.show = value;
+    }
+  },
 }
 </script>
 
@@ -220,9 +154,9 @@ export default {
 .weather-tools {
     position: absolute;
     z-index: 10;
-    margin-left: -220px;
-    margin-top: 30px;
-     :deep(.el-input) {
+    margin-left: 70vw;
+    margin-top: 20px;
+    :deep(.el-input) {
       .el-input__inner {
         height: 30px;
         width: 120px;
