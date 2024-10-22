@@ -42,6 +42,7 @@ export default {
         { value: "snow", label: "雪" },
         { value: "fog", label: "雾" },
       ], // 天气选项数组
+      modelEntity:null,
     }
   },
   async mounted() {
@@ -64,19 +65,29 @@ export default {
     this.scene = this.viewer.scene;
     this.scene.globe.depthTestAgainstTerrain = true; // 启用深度测试
 
-    // 添加一个3D实体模型
+  
+    // 将模型旋转 90 度（Heading: 偏航, Pitch: 俯仰, Roll: 滚转）
+    const heading = Cesium.Math.toRadians(90); // 偏航角 90 度
+    const pitch = 0.0;   // 保持水平
+    const roll = 0.0;    // 无滚转
+    // 模型的位置
+    const position = Cesium.Cartesian3.fromDegrees(112.94200862738567, 28.192782062027645, 0);
+    // 创建实体并设置模型和旋转角度
     const entity = this.viewer.entities.add({
       name: '3D Model with Multiple Materials',
-      position: Cesium.Cartesian3.fromDegrees(112.94572462738567, 28.187290962027645, 40),
+      position: position,
       model: {
-        uri: '3Dmodels/model.glb', // 替换为实际模型路径
-        scale: 50.0,
+        uri: '3Dmodels/jinweilouWithTile.gltf', // 替换为实际模型路径
+        scale: 1.0,
         minimumPixelSize: 128,
         maximumScale: 20000
-      }
+      },
+      // 设置模型的方向，旋转 90 度
+      orientation: Cesium.Transforms.headingPitchRollQuaternion(position, new Cesium.HeadingPitchRoll(heading, pitch, roll))
     });
-    this.Entity = entity;
-    this.viewer.flyTo(entity, { duration: 1.65 }); // 相机飞向实体位置
+    this.modelEntity = entity;
+    this.viewer.flyTo(this.modelEntity, { duration: 1.65 });
+
 
     // 事件监听器：用于与其他组件通信，处理地图/天气/地形的切换
     imageBus.$on('changeBaseMap', this.changeMap);
@@ -100,6 +111,7 @@ export default {
       this.loading = true;
       const terrainProvider = value ? await Cesium.createWorldTerrainAsync() : new Cesium.EllipsoidTerrainProvider();
       this.viewer.terrainProvider = terrainProvider;
+      this.changeModel();//切换地形后要更新模型
       this.$message({ message: `已切换到 ${value ? '3D' : '2D'} 地形`, type: 'success' });
       this.loading = false;
     },
@@ -111,6 +123,57 @@ export default {
     // 控制天气工具的显示与隐藏
     toggleWeather(value) {
       this.weatherTool = value;
+    },
+    // 切换地形后要更新模型
+    async changeModel(){
+       // 获取位置
+      const longitude = 112.94201062738567;
+      const latitude = 28.19280962027645;
+      const cartographicPosition = Cesium.Cartographic.fromDegrees(longitude, latitude);
+
+      // 检查当前地形提供者是否支持采样地形高度
+      if (this.viewer.terrainProvider instanceof Cesium.EllipsoidTerrainProvider) {
+        console.warn('当前为椭球地形，无法获取真实地形高度。');
+        // 如果是椭球地形，直接使用固定高度（如10米）
+        var terrainHeight = 0;
+        const positionOnTerrain = Cesium.Cartesian3.fromDegrees(longitude, latitude, terrainHeight);
+        this.addModel(positionOnTerrain); // 添加模型
+      } else {
+        // 如果是3D地形（如Cesium World Terrain），获取地形高度
+        try {
+          const updatedPositions = await Cesium.sampleTerrainMostDetailed(this.viewer.terrainProvider, [cartographicPosition]);
+          const terrainHeight = (updatedPositions[0].height - 7) || 10; // 如果获取高度失败，使用默认高度10米
+          const positionOnTerrain = Cesium.Cartesian3.fromDegrees(longitude, latitude, terrainHeight);
+          this.addModel(positionOnTerrain); // 添加模型
+        } catch (error) {
+          console.error('地形采样错误:', error);
+        }
+      }
+    },
+    // 切换地形后要更新模型
+    addModel(positionOnTerrain) {
+    const heading = Cesium.Math.toRadians(90);
+    const pitch = 0.0;
+    const roll = 0.0;
+
+    // 只在模型未加载时添加
+    if (!this.modelEntity) {
+        this.modelEntity = this.viewer.entities.add({
+            name: '3D Model with Multiple Materials',
+            position: positionOnTerrain,
+            model: {
+                uri: '3Dmodels/jinweilouWithTile.gltf',
+                scale: 1.0,
+                minimumPixelSize: 128,
+                maximumScale: 20000
+            },
+            orientation: Cesium.Transforms.headingPitchRollQuaternion(positionOnTerrain, new Cesium.HeadingPitchRoll(heading, pitch, roll))
+        });
+    } else {
+        // 更新已加载模型的位置
+        this.modelEntity.position = positionOnTerrain;
+        this.viewer.flyTo(this.modelEntity, { duration: 1.65 });
+    }
     },
     // 切换天气特效：根据选择的天气应用特效
     weatherChange(val) {
@@ -140,7 +203,7 @@ export default {
     },
     // 切换实体的显示与隐藏
     toggleEntitys(value) {
-      this.Entity.show = value;
+      this.modelEntity.show = value;
     },
     // 切换场景的显示与隐藏
     toggleScene(value) {
@@ -151,7 +214,9 @@ export default {
 </script>
 
 <style lang="less" scoped>
+
 .weather-tools {
+    transition: opacity 0.3s ease;
     position: absolute;
     z-index: 10;
     margin-left: 70vw;
